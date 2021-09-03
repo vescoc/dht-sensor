@@ -14,13 +14,15 @@ impl<E> From<E> for DhtError<E> {
     }
 }
 
-pub trait Delay: DelayUs<u8> + DelayMs<u8> {}
-impl<T> Delay for T where T: DelayMs<u8> + DelayUs<u8> {}
+// pub trait Delay: DelayUs<u8> + DelayMs<u8> {}
+// impl<T> Delay for T where T: DelayMs<u8> + DelayUs<u8> {}
 
 pub trait InputOutputPin<E>: InputPin<Error = E> + OutputPin<Error = E> {}
 impl<T, E> InputOutputPin<E> for T where T: InputPin<Error = E> + OutputPin<Error = E> {}
 
-fn read_bit<E>(delay: &mut dyn Delay, pin: &impl InputPin<Error = E>) -> Result<bool, DhtError<E>> {
+fn read_bit<D, E>(delay: &mut D, pin: &impl InputPin<Error = E>) -> Result<bool, DhtError<E>>
+where D: DelayUs<u8>
+{
     wait_until_timeout(delay, || pin.is_high(), 100)?;
     delay.delay_us(35u8);
     let high = pin.is_high()?;
@@ -28,7 +30,9 @@ fn read_bit<E>(delay: &mut dyn Delay, pin: &impl InputPin<Error = E>) -> Result<
     Ok(high)
 }
 
-fn read_byte<E>(delay: &mut dyn Delay, pin: &impl InputPin<Error = E>) -> Result<u8, DhtError<E>> {
+fn read_byte<D, E>(delay: &mut D, pin: &impl InputPin<Error = E>) -> Result<u8, DhtError<E>>
+where D: DelayUs<u8> + DelayMs<u8>
+{
     let mut byte: u8 = 0;
     for i in 0..8 {
         let bit_mask = 1 << (7 - (i % 8));
@@ -39,8 +43,9 @@ fn read_byte<E>(delay: &mut dyn Delay, pin: &impl InputPin<Error = E>) -> Result
     Ok(byte)
 }
 
-pub fn read_raw<P, E>(delay: &mut dyn Delay, pin: &mut P) -> Result<[u8; 4], DhtError<E>>
+pub fn read_raw<D, P, E>(delay: &mut D, pin: &mut P) -> Result<[u8; 4], DhtError<E>>
 where
+    D: DelayMs<u8> + DelayUs<u8>,
     P: InputOutputPin<E>,
 {
     pin.set_low().ok();
@@ -64,12 +69,13 @@ where
 }
 
 /// Wait until the given function returns true or the timeout is reached.
-fn wait_until_timeout<E, F>(
-    delay: &mut dyn Delay,
+fn wait_until_timeout<D, E, F>(
+    delay: &mut D,
     func: F,
     timeout_us: u8,
 ) -> Result<(), DhtError<E>>
 where
+    D: DelayUs<u8>,
     F: Fn() -> Result<bool, E>,
 {
     for _ in 0..timeout_us {

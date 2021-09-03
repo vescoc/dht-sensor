@@ -77,12 +77,15 @@
 //! ```
 #![cfg_attr(not(test), no_std)]
 
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+
 mod read;
-pub use read::{Delay, DhtError, InputOutputPin};
+pub use read::{DhtError, InputOutputPin};
 
 pub trait DhtReading: internal::FromRaw + Sized {
-    fn read<P, E>(delay: &mut dyn Delay, pin: &mut P) -> Result<Self, read::DhtError<E>>
+    fn read<D, P, E>(delay: &mut D, pin: &mut P) -> Result<Self, read::DhtError<E>>
     where
+        D: DelayMs<u8> + DelayUs<u8>,
         P: InputOutputPin<E>,
     {
         read::read_raw(delay, pin).map(Self::raw_to_reading)
